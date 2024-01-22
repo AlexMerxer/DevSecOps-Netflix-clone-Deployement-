@@ -1,0 +1,78 @@
+# update the package list
+ sudo apt update
+
+# To install docker in All three Nodes
+curl -fsSL https://get.docker.com -o install-docker.sh
+sudo sh install-docker.sh 
+
+# Now add the user to the docker Group
+ sudo usermod -aG docker ubuntu
+
+Now exit and re-login
+
+Run the command 'docker info' for the client and server information
+
+
+# To install CRI-dockerd (Always check for the latest releases in the link below)
+ https://github.com/Mirantis/cri-dockerd/releases
+# This step is specific for Ubuntu 22.04
+  ---> Execute the below commands on all three nodes
+wget https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.9/cri-dockerd_0.3.9.3-0.ubuntu-jammy_amd64.deb
+sudo dpkg -i cri-dockerd_0.3.9.3-0.ubuntu-jammy_amd64.deb
+
+# To install  kubeadm, kubectl, and kubelet on 3 nodes (Refer to the link Given below)
+  https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+
+# Now Execute the following commands on all the three nodes
+  sudo apt-get update
+  sudo apt-get install -y apt-transport-https ca-certificates curl gpg
+  curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+  sudo apt-get update
+  sudo apt-get install -y kubelet kubeadm kubectl
+  sudo apt-mark hold kubelet kubeadm kubectl
+
+# Now Let's create a k8s cluster using kubeadm Refer Here (https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/create-cluster-kubeadm/)
+* Execute the following on the master node
+* Let's initialize the cluster using the following command as a root user
+kubeadm init --pod-network-cidr 
+"10.244.0.0/16" --cri-socket "unix:///var/run/cri-dockerd.sock"
+
+# After this we will get a response like this
+  To start using your cluster, you need to run the following as a regular user:
+
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+Alternatively, if you are the root user, you can run:
+
+  export KUBECONFIG=/etc/Kubernetes/admin.conf
+
+You should now deploy a pod network to the cluster.
+Run "kubectl apply -f [podnetwork].yaml" with one of the options listed at:
+  https://kubernetes.io/docs/concepts/cluster-administration/addons/
+
+Then you can join any number of worker nodes by running the following on each as root:
+
+kubeadm join 172.31.5.55:6443 --token pvial4.3qahy9b7zobofes1 \
+        --discovery-token-ca-cert-hash sha256:d4223ea359c385eac86ad1ca9206d6d4304e1ae4734096982a206e80afe9951e
+
+
+# On the master node to run kubectl as a regular user execute the following
+ mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+   
+# After this execute the following command
+    kubectl get nodes
+
+# Now as a root user in node 1 and node 2 execute the join command (Don't copy the same command as it differs from user to user)
+  kubeadm join 172.31.5.55:6443 --token pvial4.3qahy9b7zobofes1 \
+        --discovery-token-ca-cert-hash sha256:d4223ea359c385eac86ad1ca9206d6d4304e1ae4734096982a206e80afe9951e 
+
+# Now Kubernetes needs a CNI Plugin so that pod-network is enabled. Till this is done the DNS does not work, services don't work so nodes are shown as NotReady.
+We can choose from a wide range of CNI Plugins, For this let's use flannel. Execute the following on the master node 
+
+ kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+  
